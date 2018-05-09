@@ -1,0 +1,106 @@
+---
+- hosts: all
+  gather_facts: no
+
+  pre_tasks:
+    - name: Include configuration files.
+      include_vars: "{{ item }}"
+      with_fileglob:
+        - defaults.yml
+        - local.yml
+
+    - name: Install Development Tools
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - "@Development tools"
+        - [ zlib-devel, libselinux-python ]
+      become: yes
+
+  roles: # https://github.com/jordansissel/fpm/wiki
+    - { role: azavea.fpm, become: yes }
+  environment:
+    PATH: /usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin
+
+  tasks:
+    - name: Download Source Packages
+      unarchive:
+        src: "{{ item }}"
+        dest: /home/vagrant
+        remote_src: yes
+      loop:
+        - "https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-{{libgpg_error_version}}.tar.bz2"
+        - "https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-{{libgcrypt_version}}.tar.bz2"
+        - "https://www.gnupg.org/ftp/gcrypt/libassuan/libassuan-{{libassuan_version}}.tar.bz2"
+        - "https://www.gnupg.org/ftp/gcrypt/libksba/libksba-{{libksba_version}}.tar.bz2"
+        - "https://www.gnupg.org/ftp/gcrypt/npth/npth-{{npth_version}}.tar.bz2"
+        - "https://www.gnupg.org/ftp/gcrypt/gnupg/gnupg-{{gnupg_version}}.tar.bz2"
+
+    - name: Include GnuPG Dependencies
+      include: dependency.yml
+      loop:
+        - "libgpg-error-{{ libgpg_error_version }}"
+        - "libgcrypt-{{ libgcrypt_version }}"
+        - "libassuan-{{ libassuan_version }}"
+        - "libksba-{{ libksba_version }}"
+        - "npth-{{ npth_version }}"
+
+    # https://lists.gnupg.org/pipermail/gnupg-users/2017-May/058252.html
+    - name: "Configure GnuPG {{ gnupg_version }}"
+      command: "./configure --prefix={{ prefix }} ac_cv_func_inotify_init=no"
+      args:
+        chdir: "/home/vagrant/gnupg-{{gnupg_version}}"
+      environment:
+        PATH: "{{ prefix }}/bin:/bin:/usr/bin:/usr/sbin:/sbin"
+        CPPFLAGS: "-I{{ prefix }}/include"
+        LDFLAGS: "-L{{ prefix }}/lib"
+
+    - name: "Make GnuPG {{ gnupg_version }}"
+      make:
+        chdir: "/home/vagrant/gnupg-{{gnupg_version}}"
+        params:
+      environment:
+        PATH: "{{ prefix }}/bin:/bin:/usr/bin:/usr/sbin:/sbin"
+        CPPFLAGS: "-I{{ prefix }}/include"
+        LDFLAGS: "-L{{ prefix }}/lib"
+
+    - name: "Install GnuPG {{ gnupg_version }}"
+      make:
+        chdir: "/home/vagrant/gnupg-{{gnupg_version}}"
+        target: install
+      become: yes
+
+    - name: Deploy Enable Script
+      copy:
+        content: |
+          export PATH={{ prefix }}/bin${PATH:+:${PATH}}
+          export MANPATH={{ prefix }}/share/man:${MANPATH}
+          export LD_LIBRARY_PATH={{ prefix }}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+        dest: "{{ prefix }}/enable"
+      become: yes
+
+    - name: Detect default ruby version
+      command: "{{ rvm1_rvm }} alias show default"
+      changed_when: False
+      register: ruby_version
+
+    - name: "Build {{ vendor }} GnuPG RPM"
+      command: >
+        fpm -s dir -t rpm -p /vagrant/out
+        --name {{ vendor|lower }}-gnupg
+        --version {{ gnupg_version }}
+        --rpm-summary '{{ vendor }} GnuPG {{ gnupg_version }}'
+        --iteration {{ release }}
+        --vendor {{ vendor }}
+        --maintainer '{{ vendor }} <{{ vendor_url }}>'
+        --url http://www.gnupg.org/
+        --rpm-dist el6
+        --license GPLv3+
+        "{{ prefix }}"
+      environment:
+        PATH: "/usr/local/rvm/gems/{{ ruby_version.stdout }}/bin:\
+          /usr/local/rvm/rubies/{{ ruby_version.stdout }}/bin:\
+          /usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:\
+          /sbin:/usr/local/rvm/bin"
+          

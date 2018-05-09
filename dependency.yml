@@ -1,0 +1,23 @@
+---
+- name: "Configure {{ item }}"
+  command: "./configure --prefix={{ prefix }}"
+  args:
+    chdir: "/home/vagrant/{{ item }}"
+  environment:
+    PATH: "{{ prefix }}/bin:/bin:/usr/bin:/usr/sbin:/sbin"
+    CPPFLAGS: "-I{{ prefix }}/include"
+    LDFLAGS: "-L{{ prefix }}/lib"
+
+- name: "Make {{ item }}"
+  make:
+    chdir: "/home/vagrant/{{ item }}"
+  environment:
+    PATH: "{{ prefix }}/bin:/bin:/usr/bin:/usr/sbin:/sbin"
+    CPPFLAGS: "-I{{ prefix }}/include"
+    LDFLAGS: "-L{{ prefix }}/lib"
+
+- name: "Install {{ item }}"
+  make:
+    chdir: "/home/vagrant/{{ item }}"
+    target: install
+  become: yes
