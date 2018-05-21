@@ -35,6 +35,7 @@
         - "https://www.gnupg.org/ftp/gcrypt/libassuan/libassuan-{{libassuan_version}}.tar.bz2"
         - "https://www.gnupg.org/ftp/gcrypt/libksba/libksba-{{libksba_version}}.tar.bz2"
         - "https://www.gnupg.org/ftp/gcrypt/npth/npth-{{npth_version}}.tar.bz2"
+        - "https://www.gnupg.org/ftp/gcrypt/pinentry/pinentry-{{pinentry_version}}.tar.bz2"
         - "https://www.gnupg.org/ftp/gcrypt/gnupg/gnupg-{{gnupg_version}}.tar.bz2"
 
     - name: Include GnuPG Dependencies
@@ -45,6 +46,7 @@
         - "libassuan-{{ libassuan_version }}"
         - "libksba-{{ libksba_version }}"
         - "npth-{{ npth_version }}"
+        - "pinentry-{{ pinentry_version }}"
 
     # https://lists.gnupg.org/pipermail/gnupg-users/2017-May/058252.html
     - name: "Configure GnuPG {{ gnupg_version }}"
@@ -103,4 +105,3 @@
           /usr/local/rvm/rubies/{{ ruby_version.stdout }}/bin:\
           /usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:\
           /sbin:/usr/local/rvm/bin"
-          
