@@ -9,19 +9,25 @@
         - defaults.yml
         - local.yml
 
+    - name: Create an rpm output dir
+      file:
+        path: rpm
+        state: directory
+
     - name: Install Development Tools
       yum:
         name: "{{ item }}"
         state: present
       loop:
         - "@Development tools"
-        - [ zlib-devel, libselinux-python ]
+        - [ zlib-devel, gtk2-devel, libselinux-python ]
+        - ruby-devel
       become: yes
 
-  roles: # https://github.com/jordansissel/fpm/wiki
-    - { role: azavea.fpm, become: yes }
-  environment:
-    PATH: /usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin
+    - name: Install FPM Ruby gem
+      gem:
+        name: fpm
+        state: present
 
   tasks:
     - name: Download Source Packages
@@ -82,14 +88,9 @@
         dest: "{{ prefix }}/enable"
       become: yes
 
-    - name: Detect default ruby version
-      command: "{{ rvm1_rvm }} alias show default"
-      changed_when: False
-      register: ruby_version
-
     - name: "Build {{ vendor }} GnuPG RPM"
       command: >
-        fpm -s dir -t rpm -p /vagrant/out
+        bin/fpm -s dir -t rpm -p rpm
         --name {{ vendor|lower }}-gnupg
         --version {{ gnupg_version }}
         --rpm-summary '{{ vendor }} GnuPG {{ gnupg_version }}'
@@ -97,11 +98,12 @@
         --vendor {{ vendor }}
         --maintainer '{{ vendor }} <{{ vendor_url }}>'
         --url http://www.gnupg.org/
-        --rpm-dist el6
+        --rpm-dist el7
         --license GPLv3+
         "{{ prefix }}"
-      environment:
-        PATH: "/usr/local/rvm/gems/{{ ruby_version.stdout }}/bin:\
-          /usr/local/rvm/rubies/{{ ruby_version.stdout }}/bin:\
-          /usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:\
-          /sbin:/usr/local/rvm/bin"
+
+    - name: Download new RPM's
+      synchronize:
+        mode: pull
+        src: rpm/
+        dest: out/
